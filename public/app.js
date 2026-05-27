@@ -11,22 +11,45 @@
   const searchBtnIcon = searchBtn.querySelector('.search-btn__icon');
   const searchBtnText = searchBtn.querySelector('.search-btn__text');
   const searchBtnLoader = searchBtn.querySelector('.search-btn__loader');
+  
   const errorContainer = document.getElementById('error-container');
   const errorMessage = document.getElementById('error-message');
   const resultsSection = document.getElementById('results-section');
+  
   const playlistHeader = document.getElementById('playlist-header');
   const playlistThumbnail = document.getElementById('playlist-thumbnail');
   const playlistTitle = document.getElementById('playlist-title');
   const playlistChannel = document.getElementById('playlist-channel');
   const playlistCount = document.getElementById('playlist-count');
   const downloadAllBtn = document.getElementById('download-all-btn');
+  
   const trackList = document.getElementById('track-list');
   const emptyState = document.getElementById('empty-state');
+
+  // Tabs
+  const tabSingle = document.getElementById('tab-single');
+  const tabBulk = document.getElementById('tab-bulk');
+  const containerSingle = document.getElementById('container-single');
+  const containerBulk = document.getElementById('container-bulk');
+
+  // Bulk Inputs
+  const bulkInput = document.getElementById('bulk-input');
+  const bulkSearchBtn = document.getElementById('bulk-search-btn');
+  const bulkSearchBtnIcon = bulkSearchBtn.querySelector('.search-btn__icon');
+  const bulkSearchBtnText = bulkSearchBtn.querySelector('.search-btn__text');
+  const bulkSearchBtnLoader = bulkSearchBtn.querySelector('.search-btn__loader');
+
+  // Bulk Error Log
+  const bulkErrorsContainer = document.getElementById('bulk-errors-container');
+  const bulkErrorsSummary = document.getElementById('bulk-errors-summary');
+  const toggleBulkErrors = document.getElementById('toggle-bulk-errors');
+  const bulkErrorsDetails = document.getElementById('bulk-errors-details');
 
   // ── State ───────────────────────────────────────────────────────────
   let currentTracks = [];
   let downloadQueue = [];
   let isDownloadingAll = false;
+  let activeTab = 'single'; // 'single' | 'bulk'
 
   // ── URL Validation ──────────────────────────────────────────────────
   function isValidYouTubeUrl(url) {
@@ -62,6 +85,14 @@
     searchBtnLoader.hidden = !loading;
   }
 
+  function setBulkSearchLoading(loading) {
+    bulkSearchBtn.disabled = loading;
+    bulkInput.disabled = loading;
+    bulkSearchBtnIcon.hidden = loading;
+    bulkSearchBtnText.textContent = loading ? 'Procesando...' : 'Procesar enlaces';
+    bulkSearchBtnLoader.hidden = !loading;
+  }
+
   // ── Search / Fetch Info ─────────────────────────────────────────────
   async function fetchInfo() {
     const url = urlInput.value.trim();
@@ -85,6 +116,7 @@
     setSearchLoading(true);
     emptyState.hidden = true;
     resultsSection.hidden = true;
+    bulkErrorsContainer.hidden = true;
 
     try {
       console.log('[fetchInfo] Sending POST /api/info...');
@@ -95,7 +127,6 @@
       });
 
       console.log('[fetchInfo] Response status:', res.status);
-      console.log('[fetchInfo] Response headers:', [...res.headers.entries()]);
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -117,26 +148,127 @@
     }
   }
 
+  // ── Search / Fetch Bulk Info ────────────────────────────────────────
+  async function fetchBulkInfo() {
+    const text = bulkInput.value.trim();
+    console.log('[fetchBulkInfo] Called');
+
+    if (!text) {
+      showError('Por favor, pega algún texto con enlaces de YouTube');
+      bulkInput.focus();
+      return;
+    }
+
+    hideError();
+    setBulkSearchLoading(true);
+    emptyState.hidden = true;
+    resultsSection.hidden = true;
+    bulkErrorsContainer.hidden = true;
+    bulkErrorsDetails.hidden = true;
+    bulkErrorsDetails.innerHTML = '';
+    toggleBulkErrors.textContent = 'Ver detalles';
+
+    try {
+      console.log('[fetchBulkInfo] Sending POST /api/bulk-info...');
+      const res = await fetch('/api/bulk-info', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+
+      console.log('[fetchBulkInfo] Response status:', res.status);
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        console.log('[fetchBulkInfo] Error response:', data);
+        throw new Error(data.error || 'Error al procesar los enlaces');
+      }
+
+      const data = await res.json();
+      console.log('[fetchBulkInfo] Got data, tracks:', data.tracks?.length, 'errors:', data.errors?.length);
+      currentTracks = data.tracks || [];
+      renderResults(data);
+    } catch (err) {
+      console.error('[fetchBulkInfo] Error:', err);
+      showError(err.message || 'Error de conexión. Intenta de nuevo.');
+      emptyState.hidden = false;
+    } finally {
+      setBulkSearchLoading(false);
+      console.log('[fetchBulkInfo] Done');
+    }
+  }
+
   // ── Render Results ──────────────────────────────────────────────────
   function renderResults(data) {
     resultsSection.hidden = false;
+    const playlistBadge = document.getElementById('playlist-badge');
 
-    // Playlist header
-    if (data.type === 'playlist') {
+    // Playlist or Bulk header
+    if (data.type === 'playlist' || data.type === 'bulk') {
       playlistHeader.hidden = false;
-      playlistThumbnail.src = data.thumbnail || '';
-      playlistThumbnail.alt = data.title;
-      playlistTitle.textContent = data.title;
-      playlistChannel.textContent = data.channel;
-      playlistCount.textContent = `${data.trackCount} canciones`;
 
-      if (!data.thumbnail) {
-        playlistThumbnail.style.display = 'none';
+      if (data.type === 'bulk') {
+        playlistBadge.innerHTML = `
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="9" y1="15" x2="15" y2="15"/>
+            <line x1="9" y1="11" x2="15" y2="11"/>
+            <line x1="9" y1="18" x2="15" y2="18"/>
+          </svg>
+          Descarga Masiva
+        `;
+        playlistThumbnail.src = data.tracks[0]?.thumbnail || '';
+        playlistThumbnail.alt = 'Descarga Masiva';
+        playlistThumbnail.style.display = data.tracks[0]?.thumbnail ? '' : 'none';
+
+        playlistTitle.textContent = 'Descarga Masiva de Enlaces';
+        const successfulSources = data.sources?.length || 0;
+        playlistChannel.textContent = `${successfulSources} enlaces procesados con éxito`;
+        playlistCount.textContent = `${data.trackCount} canciones únicas listas`;
+
+        // Render errors if any
+        if (data.errors && data.errors.length > 0) {
+          bulkErrorsContainer.hidden = false;
+          bulkErrorsSummary.textContent = `Algunos enlaces no pudieron ser procesados (${data.errors.length})`;
+
+          bulkErrorsDetails.innerHTML = '';
+          data.errors.forEach(err => {
+            const item = document.createElement('div');
+            item.className = 'bulk-error-item';
+            item.innerHTML = `
+              <span class="bulk-error-item__url">${escapeHtml(err.url)}</span>
+              <span class="bulk-error-item__msg">${escapeHtml(err.error)}</span>
+            `;
+            bulkErrorsDetails.appendChild(item);
+          });
+        } else {
+          bulkErrorsContainer.hidden = true;
+        }
       } else {
-        playlistThumbnail.style.display = '';
+        // Standard Playlist
+        playlistBadge.innerHTML = `
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15V6"/>
+            <path d="M18.5 18a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/>
+            <path d="M12 12H3"/>
+            <path d="M16 6H3"/>
+            <path d="M12 18H3"/>
+          </svg>
+          Playlist
+        `;
+        playlistThumbnail.src = data.thumbnail || '';
+        playlistThumbnail.alt = data.title;
+        playlistThumbnail.style.display = data.thumbnail ? '' : 'none';
+
+        playlistTitle.textContent = data.title;
+        playlistChannel.textContent = data.channel;
+        playlistCount.textContent = `${data.trackCount} canciones`;
+        bulkErrorsContainer.hidden = true;
       }
     } else {
       playlistHeader.hidden = true;
+      bulkErrorsContainer.hidden = true;
     }
 
     // Track list
@@ -390,13 +522,36 @@
   }
 
   // ── Event Listeners ─────────────────────────────────────────────────
+  
+  // Tab Switching
+  tabSingle.addEventListener('click', () => {
+    if (activeTab === 'single') return;
+    activeTab = 'single';
+    tabSingle.classList.add('search-tab--active');
+    tabBulk.classList.remove('search-tab--active');
+    containerSingle.hidden = false;
+    containerBulk.hidden = true;
+    urlInput.focus();
+  });
+
+  tabBulk.addEventListener('click', () => {
+    if (activeTab === 'bulk') return;
+    activeTab = 'bulk';
+    tabBulk.classList.add('search-tab--active');
+    tabSingle.classList.remove('search-tab--active');
+    containerSingle.hidden = true;
+    containerBulk.hidden = false;
+    bulkInput.focus();
+  });
+
+  // Single Search
   searchBtn.addEventListener('click', fetchInfo);
 
   urlInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') fetchInfo();
   });
 
-  // Auto-detect paste
+  // Auto-detect paste on single input
   urlInput.addEventListener('paste', () => {
     setTimeout(() => {
       if (isValidYouTubeUrl(urlInput.value.trim())) {
@@ -405,6 +560,17 @@
     }, 100);
   });
 
+  // Bulk Search
+  bulkSearchBtn.addEventListener('click', fetchBulkInfo);
+
+  // Toggle Bulk Errors Log
+  toggleBulkErrors.addEventListener('click', () => {
+    const isHidden = bulkErrorsDetails.hidden;
+    bulkErrorsDetails.hidden = !isHidden;
+    toggleBulkErrors.textContent = isHidden ? 'Ocultar detalles' : 'Ver detalles';
+  });
+
+  // Download All
   downloadAllBtn.addEventListener('click', downloadAll);
 
   // Focus input on load
