@@ -32,7 +32,10 @@ export class DownloadQueue {
 
   /** @param {QueuedTrack[]} tracks */
   setTracks(tracks) {
-    this.tracks = [...tracks];
+    this.tracks = tracks.map(t => ({
+      ...t,
+      jobId: t.jobId || `${t.id}-${Math.random().toString(36).substr(2, 9)}`
+    }));
     this.isCancelled = false;
   }
 
@@ -77,40 +80,60 @@ export class DownloadQueue {
   }
 
   async _processTrack(track) {
-    // Step 1: Resolve YouTube candidate
-    this._emit(track.id, 'resolving', { message: 'Buscando en YouTube...' });
+    const maxRetries = 3;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      if (this.isCancelled) return;
 
-    let youtubeUrl;
-    try {
-      const result = await resolveTrackCandidate({
-        artistName: track.artistName,
-        trackName: track.title,
-        albumName: track.albumName,
-        durationMs: track.durationMs,
-      });
+      if (attempt > 1) {
+        this._emit(track.jobId, 'resolving', { message: `Reintentando (${attempt}/${maxRetries})...` });
+        await new Promise(r => setTimeout(r, 2000));
+      } else {
+        // Step 1: Resolve YouTube candidate
+        this._emit(track.jobId, 'resolving', { message: 'Buscando en YouTube...' });
+      }
 
-      youtubeUrl = result.url;
-      this._emit(track.id, 'resolved', {
-        url: youtubeUrl,
-        title: result.title,
-        score: result.score,
-      });
-    } catch (err) {
-      this._emit(track.id, 'error', {
-        message: err.message || 'No se encontró candidato en YouTube',
-      });
-      return;
-    }
+      let youtubeUrl;
+      try {
+        const result = await resolveTrackCandidate({
+          artistName: track.artistName,
+          trackName: track.title,
+          albumName: track.albumName,
+          durationMs: track.durationMs,
+        });
 
-    if (this.isCancelled) return;
+        youtubeUrl = result.url;
+        this._emit(track.jobId, 'resolved', {
+          url: youtubeUrl,
+          title: result.title,
+          score: result.score,
+        });
+      } catch (err) {
+        if (attempt === maxRetries) {
+          this._emit(track.jobId, 'error', {
+            message: err.message || 'No se encontró candidato en YouTube',
+            details: err.stack || err.message,
+          });
+          return;
+        }
+        continue;
+      }
 
-    // Step 2: Download via existing /api/download endpoint (SSE)
-    try {
-      await this._downloadViaSSE(track, youtubeUrl);
-    } catch (err) {
-      this._emit(track.id, 'error', {
-        message: err.message || 'Error durante la descarga',
-      });
+      if (this.isCancelled) return;
+
+      // Step 2: Download via existing /api/download endpoint (SSE)
+      try {
+        await this._downloadViaSSE(track, youtubeUrl);
+        return; // Success, exit retry loop
+      } catch (err) {
+        if (attempt === maxRetries) {
+          this._emit(track.jobId, 'error', {
+            message: err.message || 'Error durante la descarga',
+            details: err.stack || err.message,
+          });
+          return;
+        }
+      }
     }
   }
 
@@ -119,7 +142,7 @@ export class DownloadQueue {
    * This is the exact same flow used by the existing single/bulk tabs.
    */
   async _downloadViaSSE(track, youtubeUrl) {
-    this._emit(track.id, 'downloading', { percent: 0, message: 'Iniciando descarga...' });
+    this._emit(track.jobId, 'downloading', { percent: 0, message: 'Iniciando descarga...' });
 
     const response = await fetch('/api/download', {
       method: 'POST',
@@ -155,14 +178,14 @@ export class DownloadQueue {
             const data = JSON.parse(line.slice(6));
 
             if (eventType === 'progress') {
-              this._emit(track.id, 'downloading', {
+              this._emit(track.jobId, 'downloading', {
                 percent: data.percent,
                 message: data.status,
               });
             } else if (eventType === 'complete') {
               // Trigger file download via hidden anchor
               this._triggerFileDownload(data.downloadId, data.filename);
-              this._emit(track.id, 'complete', { filename: data.filename });
+              this._emit(track.jobId, 'complete', { filename: data.filename });
             } else if (eventType === 'error') {
               throw new Error(data.message);
             }

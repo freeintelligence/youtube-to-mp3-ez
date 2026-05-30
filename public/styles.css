@@ -1647,6 +1647,74 @@ body {
   padding: var(--space-xs) var(--space-sm);
   font-size: 0.8rem;
 }
+/* ── Error Details UI ────────────────────────────────────────────────── */
+
+.music-error-btn {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--danger-color);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-left: var(--space-sm);
+  transition: all 0.2s ease;
+}
+
+.music-error-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+.music-error-modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 0;
+  width: 90%;
+  max-width: 600px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  color: var(--text-primary);
+}
+
+.music-error-modal::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+}
+
+.music-error-modal__content {
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.music-error-modal__title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--danger-color);
+}
+
+.music-error-modal__details {
+  background: var(--surface-hover);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  font-family: monospace;
+  font-size: 0.875rem;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 300px;
+  overflow-y: auto;
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.music-error-modal__close {
+  align-self: flex-end;
+}
 
 /* ── Responsive: Music Components ────────────────────────────────── */
 @media (max-width: 640px) {

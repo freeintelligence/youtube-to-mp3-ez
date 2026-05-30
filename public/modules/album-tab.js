@@ -298,19 +298,21 @@ async function handleStartDownload() {
       progress: 0,
       error: '',
     });
+    // Use jobId to avoid querySelector collisions when duplicate IDs exist
+    row.dataset.jobId = track.jobId;
     list.appendChild(row);
   });
 
   albumResultsSection.appendChild(list);
 
-  const queue = new DownloadQueue((trackId, status, data) => {
-    if (trackId === '__queue__') {
+  const queue = new DownloadQueue((jobId, status, data) => {
+    if (jobId === '__queue__') {
       const title = albumResultsSection.querySelector('.music-section-title');
       if (title) title.textContent = '¡Descarga completada!';
       return;
     }
 
-    const row = list.querySelector(`[data-track-id="${trackId}"]`);
+    const row = list.querySelector(`[data-job-id="${jobId}"]`);
     if (!row) return;
 
     const statusMap = {
@@ -344,7 +346,24 @@ async function handleStartDownload() {
         complete: '¡Listo!',
         error: data.message || 'Error',
       };
-      statusText.textContent = texts[statusMap[status]] || status;
+      if (status === 'error' && data && data.message) {
+        statusText.textContent = data.message;
+        // Show error details button if available
+        let errorBtn = row.querySelector('.music-error-btn');
+        if (!errorBtn && data.details) {
+          errorBtn = document.createElement('button');
+          errorBtn.className = 'music-error-btn';
+          errorBtn.innerHTML = 'Detalles';
+          errorBtn.title = 'Ver detalles del error';
+          errorBtn.onclick = () => window.showErrorModal(data.details);
+          const actions = row.querySelector('.music-download-row__actions');
+          if (actions) actions.appendChild(errorBtn);
+        }
+      } else if (status === 'complete' && data && data.filename) {
+        statusText.textContent = '¡Listo!';
+      } else {
+        statusText.textContent = texts[statusMap[status]] || status;
+      }
     }
 
     if (status === 'downloading' && data.percent !== undefined) {

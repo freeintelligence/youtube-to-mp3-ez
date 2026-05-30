@@ -328,7 +328,12 @@ function getSelectedTracks() {
       // Use per-track selection
       for (const track of tracks) {
         if (sel.tracks[track.id] !== false) {
-          selected.push(track);
+          selected.push({
+            ...track,
+            albumType: album.type,
+            albumYear: album.year,
+            albumId: album.id
+          });
         }
       }
     } else if (sel.selected) {
@@ -427,13 +432,46 @@ async function handleStartDownload() {
     tracksToDownload = getSelectedTracks().filter(t => !t._needsLoading);
   }
 
+  // Deduplicate tracks by MusicBrainz recording ID (track.id), prioritizing albums over compilations
+  const uniqueTracksMap = new Map();
+  for (const t of tracksToDownload) {
+    const existing = uniqueTracksMap.get(t.id);
+    if (!existing) {
+      uniqueTracksMap.set(t.id, t);
+    } else {
+      // Priority: 'Album' > 'EP' > 'Single' > others
+      const getPriority = (type) => {
+        if (type === 'Album') return 3;
+        if (type === 'EP') return 2;
+        if (type === 'Single') return 1;
+        return 0;
+      };
+      
+      const pExisting = getPriority(existing.albumType);
+      const pNew = getPriority(t.albumType);
+      
+      if (pNew > pExisting) {
+        uniqueTracksMap.set(t.id, t);
+      } else if (pNew === pExisting) {
+        // If same type, prioritize older album
+        const yearExisting = parseInt(existing.albumYear) || 9999;
+        const yearNew = parseInt(t.albumYear) || 9999;
+        if (yearNew < yearExisting) {
+          uniqueTracksMap.set(t.id, t);
+        }
+      }
+    }
+  }
+  
+  tracksToDownload = Array.from(uniqueTracksMap.values());
+  
   if (tracksToDownload.length === 0) return;
 
   state.phase = 'downloading';
   renderDownloadQueue(tracksToDownload);
 
-  const queue = new DownloadQueue((trackId, status, data) => {
-    updateDownloadRowStatus(trackId, status, data);
+  const queue = new DownloadQueue((jobId, status, data) => {
+    updateDownloadRowStatus(jobId, status, data);
   });
 
   queue.setTracks(tracksToDownload);
@@ -463,14 +501,16 @@ function renderDownloadQueue(tracks) {
       progress: 0,
       error: '',
     });
+    // Use jobId to avoid querySelector collisions when duplicate IDs exist
+    row.dataset.jobId = track.jobId;
     list.appendChild(row);
   });
 
   artistResultsSection.appendChild(list);
 }
 
-function updateDownloadRowStatus(trackId, status, data) {
-  if (trackId === '__queue__') {
+function updateDownloadRowStatus(jobId, status, data) {
+  if (jobId === '__queue__') {
     // Queue complete
     const header = artistResultsSection.querySelector('.music-section-title');
     if (header) header.textContent = '¡Descarga completada!';
@@ -480,7 +520,7 @@ function updateDownloadRowStatus(trackId, status, data) {
   const list = document.getElementById('artist-download-list');
   if (!list) return;
 
-  const existingRow = list.querySelector(`[data-track-id="${trackId}"]`);
+  const existingRow = list.querySelector(`[data-job-id="${jobId}"]`);
   if (!existingRow) return;
 
   // Map internal status to display status
@@ -518,7 +558,24 @@ function updateDownloadRowStatus(trackId, status, data) {
       complete: '¡Listo!',
       error: data.message || 'Error',
     };
-    statusText.textContent = texts[statusMap[status]] || status;
+    if (status === 'error' && data && data.message) {
+      statusText.textContent = data.message;
+      // Show error details button if available
+      let errorBtn = existingRow.querySelector('.music-error-btn');
+      if (!errorBtn && data.details) {
+        errorBtn = document.createElement('button');
+        errorBtn.className = 'music-error-btn';
+        errorBtn.innerHTML = 'Detalles';
+        errorBtn.title = 'Ver detalles del error';
+        errorBtn.onclick = () => window.showErrorModal(data.details);
+        const actions = existingRow.querySelector('.music-download-row__actions');
+        if (actions) actions.appendChild(errorBtn);
+      }
+    } else if (status === 'complete' && data && data.filename) {
+      statusText.textContent = '¡Listo!';
+    } else {
+      statusText.textContent = texts[statusMap[status]] || status;
+    }
   }
 
   // Progress bar
