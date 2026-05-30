@@ -529,7 +529,7 @@ export function createSelectionSummary(textLeft, textButton, onDownload, isDisab
 
 // ── Download Job Row (for the download queue UI) ──
 
-export function createDownloadJobRow(job) {
+export function createDownloadJobRow(job, { onCancel } = {}) {
   const row = document.createElement('div');
   row.className = `music-download-row music-download-row--${job.status}`;
   row.dataset.trackId = job.track.id;
@@ -566,7 +566,23 @@ export function createDownloadJobRow(job) {
         <div class="progress-bar"><div class="progress-bar__fill" style="width:${job.progress}%"></div></div>
       </div>
     ` : ''}
+    <div class="music-download-row__actions">
+      ${(job.status === 'pending' || job.status === 'resolving' || job.status === 'downloading') ? `
+        <button class="music-cancel-track-btn" title="Cancelar descarga">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      ` : ''}
+    </div>
   `;
+
+  const cancelBtn = row.querySelector('.music-cancel-track-btn');
+  if (cancelBtn && onCancel) {
+    cancelBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      onCancel(job);
+    });
+  }
+
   return row;
 }
 

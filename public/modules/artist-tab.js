@@ -571,15 +571,20 @@ async function handleStartDownload() {
 
   const header = document.createElement('div');
   header.className = 'music-section-header';
-  const titleEl = document.createElement('h3');
-  titleEl.className = 'music-section-title';
-  titleEl.textContent = `Preparando descargas...`;
-  const subtitleEl = document.createElement('span');
-  subtitleEl.className = 'music-section-subtitle';
-  subtitleEl.textContent = escapeHtml(state.selectedArtist?.name || '');
-  header.appendChild(titleEl);
-  header.appendChild(subtitleEl);
+  header.innerHTML = `
+    <div style="display: flex; flex-direction: column;">
+      <h3 class="music-section-title">Preparando descargas...</h3>
+      <span class="music-section-subtitle">${escapeHtml(state.selectedArtist?.name || '')}</span>
+    </div>
+    <button class="btn btn--ghost btn--sm music-cancel-all-btn" style="margin-left: auto;" type="button">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right: 6px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      Cancelar todo
+    </button>
+  `;
   artistResultsSection.appendChild(header);
+
+  const titleEl = header.querySelector('.music-section-title');
+  const cancelAllBtn = header.querySelector('.music-cancel-all-btn');
 
   const list = document.createElement('div');
   list.className = 'music-download-list';
@@ -591,13 +596,17 @@ async function handleStartDownload() {
   const appendToDOM = (tracks) => {
     tracks.forEach(track => {
       const row = createDownloadJobRow({
-        track, status: 'pending', progress: 0, error: ''
+        track, status: 'pending', progress: 0, error: '', jobId: track.jobId
+      }, {
+        onCancel: (j) => {
+          queue.cancelTrack(j.track.jobId);
+        }
       });
       row.dataset.jobId = track.jobId;
       list.appendChild(row);
     });
     totalEnqueued += tracks.length;
-    if (totalEnqueued > 0) {
+    if (totalEnqueued > 0 && !queue.isCancelled) {
       titleEl.textContent = `Descargando ${totalEnqueued} canciones`;
     }
   };
@@ -606,10 +615,16 @@ async function handleStartDownload() {
     updateDownloadRowStatus(jobId, status, data);
   });
   
+  cancelAllBtn.addEventListener('click', () => {
+    queue.cancel();
+    titleEl.textContent = 'Descargas canceladas';
+    cancelAllBtn.style.display = 'none';
+  });
+
   // Start queue immediately with whatever we have ready
   queue.setTracks(tracksToDownload);
   appendToDOM(queue.tracks);
-  queue.start(3); // Start workers (they will wait dynamically if isFetchingMore=true)
+  queue.start(3, true); // Start workers immediately with dynamic support enabled
 
   // Fetch missing albums incrementally
   for (const item of needsLoading) {
@@ -659,9 +674,16 @@ async function handleStartDownload() {
 
 function updateDownloadRowStatus(jobId, status, data) {
   if (jobId === '__queue__') {
-    // Queue complete
-    const header = artistResultsSection.querySelector('.music-section-title');
-    if (header) header.textContent = '¡Descarga completada!';
+    if (status === 'complete') {
+      const header = artistResultsSection.querySelector('.music-section-title');
+      if (header) {
+        const activeRows = artistResultsSection.querySelectorAll('.music-download-row');
+        const allCancelled = activeRows.length > 0 && Array.from(activeRows).every(row => row.classList.contains('music-download-row--error') && row.querySelector('.music-download-row__status-text').textContent === 'Descarga cancelada');
+        header.textContent = allCancelled ? 'Descargas canceladas' : '¡Descarga completada!';
+      }
+      const cancelAllBtn = artistResultsSection.querySelector('.music-cancel-all-btn');
+      if (cancelAllBtn) cancelAllBtn.style.display = 'none';
+    }
     return;
   }
 

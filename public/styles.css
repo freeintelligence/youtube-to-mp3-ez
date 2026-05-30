@@ -1605,6 +1605,36 @@ body {
   flex-shrink: 0;
 }
 
+.music-download-row__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.music-cancel-track-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.music-cancel-track-btn:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.music-download-row--complete .music-cancel-track-btn,
+.music-download-row--error .music-cancel-track-btn {
+  display: none;
+}
+
 /* ── Progress Bar ────────────────────────────────────────────────── */
 .progress-bar {
   width: 100%;
@@ -2038,4 +2068,58 @@ body {
 /* Adjust floating player position so it doesn't overlap global audio player */
 .music-floating-player {
   bottom: 100px;
+}
+
+/* ── Floating Download Controls ───────────────────────────────────── */
+.floating-download-controls {
+  position: fixed;
+  top: 80px; /* Offset to not cover navigation bar */
+  right: var(--space-lg);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: 10px 18px;
+  border-radius: var(--radius-full);
+  background: rgba(20, 20, 25, 0.85);
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: var(--shadow-lg), 0 0 20px rgba(124, 58, 237, 0.15);
+  transform: translateY(-20px);
+  opacity: 0;
+  pointer-events: none;
+  transition: all var(--transition-normal);
+}
+
+.floating-download-controls.visible {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.floating-download-controls__status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.floating-download-controls__text {
+  white-space: nowrap;
+}
+
+/* Spinner helper for small size */
+.spinner--sm {
+  width: 14px;
+  height: 14px;
+  border-width: 2px;
+}
+
+.floating-download-controls__pause,
+.floating-download-controls__cancel {
+  border-radius: var(--radius-full) !important;
+  white-space: nowrap;
 }
