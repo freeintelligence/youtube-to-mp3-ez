@@ -1716,6 +1716,89 @@ body {
   align-self: flex-end;
 }
 
+/* ── Floating Player & Play Button ─────────────────────────────────────── */
+
+.music-play-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  margin-left: auto;
+}
+
+.music-play-btn:hover {
+  color: var(--accent-purple);
+  background: rgba(139, 92, 246, 0.1);
+}
+
+.music-track-row__cover {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  object-fit: cover;
+  margin-right: var(--space-sm);
+  background: var(--surface-hover);
+}
+
+.music-floating-player {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 360px;
+  background: var(--surface);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 10px 30px -10px rgba(0,0,0,0.8);
+  z-index: 1000;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: fadeInUp 0.3s ease;
+}
+
+.music-floating-player__header {
+  padding: var(--space-sm) var(--space-md);
+  background: rgba(255,255,255,0.02);
+  border-bottom: 1px solid var(--border-glass);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.music-floating-player__title {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.music-floating-player__close {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.music-floating-player__close:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.music-floating-player__body {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #000;
+}
+
 /* ── Responsive: Music Components ────────────────────────────────── */
 @media (max-width: 640px) {
   .music-result-card {

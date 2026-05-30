@@ -257,9 +257,49 @@ function renderAlbumTracks(album, wrapper) {
   }
 
   tracks.forEach(track => {
+    // Inject album cover so createTrackRow can use it
+    track.coverArtUrl = album.coverArtUrl;
     const isChecked = state.selection[album.id]?.tracks[track.id] !== false;
+    
     const row = createTrackRow(track, {
       onCheckChange: (t, checked) => handleTrackCheckChange(album.id, t, checked),
+      onPlay: async (t, btn, rowEl) => {
+        try {
+          btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;"></div>';
+          btn.disabled = true;
+          
+          const res = await fetch('/api/music/resolve-track', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              title: t.title, 
+              artistName: state.selectedArtist.name, 
+              albumName: album.title, 
+              durationMs: t.durationMs 
+            })
+          });
+          
+          if (!res.ok) throw new Error('Video no encontrado');
+          const data = await res.json();
+          
+          if (data.url) {
+            const cover = rowEl.querySelector('.music-track-row__cover');
+            if (cover && data.thumbnail) {
+              cover.src = data.thumbnail;
+              cover.style.display = 'block';
+            }
+            window.showYouTubePlayer(data.url);
+          } else {
+            throw new Error('No URL returned');
+          }
+        } catch (err) {
+          console.error(err);
+          alert('Error al reproducir: ' + err.message);
+        } finally {
+          btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
+          btn.disabled = false;
+        }
+      },
       isChecked,
     });
     body.appendChild(row);

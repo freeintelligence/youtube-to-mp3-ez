@@ -34,6 +34,49 @@ export function createFilterPills(types, activeTypes, onToggle) {
   return container;
 }
 
+// ── Floating YouTube Player ──
+
+window.showYouTubePlayer = function(url) {
+  let videoId = null;
+  try {
+    const u = new URL(url);
+    if (u.hostname.includes('youtube.com')) {
+      videoId = u.searchParams.get('v');
+    } else if (u.hostname.includes('youtu.be')) {
+      videoId = u.pathname.substring(1);
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  if (!videoId) {
+    console.error('Invalid YouTube URL for player:', url);
+    return;
+  }
+
+  let existing = document.getElementById('music-floating-player');
+  if (existing) {
+    existing.remove();
+  }
+
+  const container = document.createElement('div');
+  container.id = 'music-floating-player';
+  container.className = 'music-floating-player';
+  container.innerHTML = `
+    <div class="music-floating-player__header">
+      <span class="music-floating-player__title">Reproductor</span>
+      <button class="music-floating-player__close" onclick="this.parentElement.parentElement.remove()" title="Cerrar reproductor">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="music-floating-player__body">
+      <iframe width="100%" height="100%" src="https://www.youtube.com/embed/${videoId}?autoplay=1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+    </div>
+  `;
+
+  document.body.appendChild(container);
+};
+
 // ── Artist Card ──
 
 export function createArtistCard(artist, onClick) {
@@ -147,7 +190,7 @@ export function createAlbumAccordion(album, { onToggle, onCheckChange, isChecked
 
 // ── Track Row ──
 
-export function createTrackRow(track, { onCheckChange, isChecked = true }) {
+export function createTrackRow(track, { onCheckChange, onPlay, isChecked = true }) {
   const row = document.createElement('div');
   row.className = 'music-track-row';
   row.dataset.trackId = track.id;
@@ -155,19 +198,33 @@ export function createTrackRow(track, { onCheckChange, isChecked = true }) {
   const durationFormatted = track.durationFormatted ||
     (track.durationMs ? formatDuration(track.durationMs) : '');
 
+  // SVG placeholder for missing cover
+  const placeholderCover = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
+  const coverUrl = track.coverArtUrl || track.thumbnail || placeholderCover;
+
   row.innerHTML = `
     <label class="track-checkbox" onclick="event.stopPropagation()">
       <input type="checkbox" class="music-track-cb" data-track-id="${track.id}" ${isChecked ? 'checked' : ''}>
       <span class="checkbox-mark"></span>
     </label>
     <span class="music-track-row__position">${track.position || ''}</span>
+    <img class="music-track-row__cover" src="${escapeHtml(coverUrl)}" alt="Cover" loading="lazy" />
     <span class="music-track-row__title">${escapeHtml(track.title)}</span>
     <span class="music-track-row__duration">${durationFormatted}</span>
+    <button class="music-play-btn" title="Reproducir">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+    </button>
   `;
 
   const cb = row.querySelector('.music-track-cb');
   cb.addEventListener('change', () => {
     if (onCheckChange) onCheckChange(track, cb.checked);
+  });
+
+  const playBtn = row.querySelector('.music-play-btn');
+  playBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (onPlay) onPlay(track, playBtn, row);
   });
 
   return row;
