@@ -2,15 +2,36 @@
   "name": "youtube-mp3-downloader",
   "version": "1.0.0",
   "description": "Web app to download MP3 from YouTube videos and playlists",
-  "main": "server.js",
+  "main": "main.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "electron:start": "electron .",
+    "electron:build": "electron-builder --mac"
+  },
+  "build": {
+    "appId": "com.youtube.downloader",
+    "productName": "YouTube Downloader",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "mac": {
+      "icon": "build/icon.png",
+      "category": "public.app-category.music"
+    },
+    "asarUnpack": [
+      "node_modules/ffmpeg-static/**/*",
+      "node_modules/youtube-dl-exec/**/*"
+    ]
   },
   "dependencies": {
     "express": "^4.21.0",
-    "youtube-dl-exec": "^3.0.0",
     "ffmpeg-static": "^5.2.0",
-    "uuid": "^10.0.0"
+    "uuid": "^10.0.0",
+    "youtube-dl-exec": "^3.0.0"
+  },
+  "devDependencies": {
+    "electron": "^42.3.0",
+    "electron-builder": "^26.8.1"
   }
 }

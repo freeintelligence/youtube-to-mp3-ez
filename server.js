@@ -10,7 +10,14 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Directory for temporary downloads
-const DOWNLOADS_DIR = path.join(__dirname, 'downloads');
+let DOWNLOADS_DIR;
+if (process.versions && process.versions.electron) {
+  const { app } = require('electron');
+  DOWNLOADS_DIR = path.join(app.getPath('temp'), 'youtube-mp3-downloads');
+} else {
+  DOWNLOADS_DIR = path.join(__dirname, 'downloads');
+}
+
 if (!fs.existsSync(DOWNLOADS_DIR)) {
   fs.mkdirSync(DOWNLOADS_DIR, { recursive: true });
 }
@@ -602,9 +609,32 @@ app.get('*', (req, res) => {
 
 // ── Start server ─────────────────────────────────────────────────────
 
-app.listen(PORT, () => {
-  console.log(`\n  🎵 YouTube MP3 Downloader`);
-  console.log(`  ────────────────────────`);
-  console.log(`  Servidor corriendo en: http://localhost:${PORT}`);
-  console.log(`  Presiona Ctrl+C para detener\n`);
-});
+// ── Start server ─────────────────────────────────────────────────────
+
+function startServer(port = PORT) {
+  return new Promise((resolve, reject) => {
+    const server = app.listen(port, () => {
+      console.log(`\n  🎵 YouTube MP3 Downloader`);
+      console.log(`  ────────────────────────`);
+      console.log(`  Servidor corriendo en: http://localhost:${port}`);
+      console.log(`  Presiona Ctrl+C para detener\n`);
+      resolve({ server, port });
+    });
+
+    server.on('error', (e) => {
+      if (e.code === 'EADDRINUSE') {
+        console.log(`  Puerto ${port} en uso, intentando ${port + 1}...`);
+        resolve(startServer(port + 1));
+      } else {
+        reject(e);
+      }
+    });
+  });
+}
+
+// Inicia automáticamente si se ejecuta directo (ej: node server.js o web dev)
+if (!process.versions || !process.versions.electron) {
+  startServer(PORT);
+}
+
+module.exports = { app, startServer };
