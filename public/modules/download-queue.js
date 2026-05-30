@@ -39,6 +39,18 @@ export class DownloadQueue {
     this.isCancelled = false;
   }
 
+  addTracks(newTracks) {
+    const initializedTracks = newTracks.map(t => ({
+      ...t,
+      jobId: t.jobId || `${t.id}-${Math.random().toString(36).substr(2, 9)}`
+    }));
+    this.tracks.push(...initializedTracks);
+  }
+
+  finishAddingTracks() {
+    this.isFetchingMore = false;
+  }
+
   cancel() {
     this.isCancelled = true;
   }
@@ -50,19 +62,28 @@ export class DownloadQueue {
     if (this.isRunning) return;
     this.isRunning = true;
     this.isCancelled = false;
+    this.isFetchingMore = true; // Wait for more tracks dynamically
 
     let currentIndex = 0;
 
     const worker = async () => {
-      while (currentIndex < this.tracks.length && !this.isCancelled) {
-        const i = currentIndex++;
-        const track = this.tracks[i];
+      while (!this.isCancelled) {
+        if (currentIndex < this.tracks.length) {
+          const i = currentIndex++;
+          const track = this.tracks[i];
 
-        await this._processTrack(track);
+          await this._processTrack(track);
 
-        // Small delay between tracks on the same worker
-        if (!this.isCancelled && currentIndex < this.tracks.length) {
-          await new Promise(r => setTimeout(r, 1000));
+          // Small delay between tracks on the same worker
+          if (!this.isCancelled && currentIndex < this.tracks.length) {
+            await new Promise(r => setTimeout(r, 1000));
+          }
+        } else if (this.isFetchingMore) {
+          // Wait for more tracks to be added
+          await new Promise(r => setTimeout(r, 500));
+        } else {
+          // No more tracks and not fetching more, exit worker
+          break;
         }
       }
     };

@@ -402,112 +402,135 @@ function updateSelectionSummary() {
 // ── Download ──
 
 async function handleStartDownload() {
-  let tracksToDownload = getSelectedTracks();
-
-  // Load tracks for albums that haven't been expanded yet
-  const needsLoading = tracksToDownload.filter(t => t._needsLoading);
-  if (needsLoading.length > 0) {
-    renderLoading('Cargando canciones de álbumes no expandidos...');
-
-    const loadedTracks = [];
-    for (const item of needsLoading) {
-      try {
-        const data = await getAlbumTracks(item.albumId);
-        state.albumTracks[item.albumId] = data.tracks || [];
-
-        // Initialize track selection
-        data.tracks.forEach(track => {
-          if (!state.selection[item.albumId].tracks[track.id]) {
-            state.selection[item.albumId].tracks[track.id] = true;
-          }
-        });
-
-        loadedTracks.push(...data.tracks);
-      } catch (err) {
-        console.error(`Error loading tracks for album ${item.albumId}:`, err);
-      }
-    }
-
-    // Rebuild selected list
-    tracksToDownload = getSelectedTracks().filter(t => !t._needsLoading);
-  }
-
-  // Deduplicate tracks by MusicBrainz recording ID (track.id), prioritizing albums over compilations
-  const uniqueTracksMap = new Map();
-  for (const t of tracksToDownload) {
-    const existing = uniqueTracksMap.get(t.id);
-    if (!existing) {
-      uniqueTracksMap.set(t.id, t);
-    } else {
-      // Priority: 'Album' > 'EP' > 'Single' > others
-      const getPriority = (type) => {
-        if (type === 'Album') return 3;
-        if (type === 'EP') return 2;
-        if (type === 'Single') return 1;
-        return 0;
-      };
-      
-      const pExisting = getPriority(existing.albumType);
-      const pNew = getPriority(t.albumType);
-      
-      if (pNew > pExisting) {
-        uniqueTracksMap.set(t.id, t);
-      } else if (pNew === pExisting) {
-        // If same type, prioritize older album
-        const yearExisting = parseInt(existing.albumYear) || 9999;
-        const yearNew = parseInt(t.albumYear) || 9999;
-        if (yearNew < yearExisting) {
-          uniqueTracksMap.set(t.id, t);
-        }
-      }
-    }
-  }
+  const initialTracks = getSelectedTracks();
   
-  tracksToDownload = Array.from(uniqueTracksMap.values());
-  
-  if (tracksToDownload.length === 0) return;
+  const readyTracks = initialTracks.filter(t => !t._needsLoading);
+  const needsLoading = initialTracks.filter(t => t._needsLoading);
 
-  state.phase = 'downloading';
-  renderDownloadQueue(tracksToDownload);
+  if (readyTracks.length === 0 && needsLoading.length === 0) return;
 
-  const queue = new DownloadQueue((jobId, status, data) => {
-    updateDownloadRowStatus(jobId, status, data);
+  const getPriority = (type) => {
+    if (type === 'Album') return 3;
+    if (type === 'EP') return 2;
+    if (type === 'Single') return 1;
+    return 0;
+  };
+
+  // Sort needsLoading so we fetch original/older albums first, guaranteeing correct deduplication priority
+  needsLoading.sort((a, b) => {
+    const pA = getPriority(a.albumType);
+    const pB = getPriority(b.albumType);
+    if (pA !== pB) return pB - pA;
+    const yA = parseInt(a.albumYear) || 9999;
+    const yB = parseInt(b.albumYear) || 9999;
+    return yA - yB;
   });
 
-  queue.setTracks(tracksToDownload);
-  await queue.start();
-}
+  const seenTrackIds = new Set();
+  const enqueueTracks = (tracks) => {
+    const unique = [];
+    for (const t of tracks) {
+      if (!seenTrackIds.has(t.id)) {
+        seenTrackIds.add(t.id);
+        unique.push(t);
+      }
+    }
+    return unique;
+  };
 
-function renderDownloadQueue(tracks) {
+  const tracksToDownload = enqueueTracks(readyTracks);
+  
+  state.phase = 'downloading';
   artistResultsSection.innerHTML = '';
   artistResultsSection.hidden = false;
 
   const header = document.createElement('div');
   header.className = 'music-section-header';
-  header.innerHTML = `
-    <h3 class="music-section-title">Descargando ${tracks.length} canciones</h3>
-    <span class="music-section-subtitle">${escapeHtml(state.selectedArtist?.name || '')}</span>
-  `;
+  const titleEl = document.createElement('h3');
+  titleEl.className = 'music-section-title';
+  titleEl.textContent = `Preparando descargas...`;
+  const subtitleEl = document.createElement('span');
+  subtitleEl.className = 'music-section-subtitle';
+  subtitleEl.textContent = escapeHtml(state.selectedArtist?.name || '');
+  header.appendChild(titleEl);
+  header.appendChild(subtitleEl);
   artistResultsSection.appendChild(header);
 
   const list = document.createElement('div');
   list.className = 'music-download-list';
   list.id = 'artist-download-list';
-
-  tracks.forEach(track => {
-    const row = createDownloadJobRow({
-      track,
-      status: 'pending',
-      progress: 0,
-      error: '',
-    });
-    // Use jobId to avoid querySelector collisions when duplicate IDs exist
-    row.dataset.jobId = track.jobId;
-    list.appendChild(row);
-  });
-
   artistResultsSection.appendChild(list);
+
+  let totalEnqueued = 0;
+
+  const appendToDOM = (tracks) => {
+    tracks.forEach(track => {
+      const row = createDownloadJobRow({
+        track, status: 'pending', progress: 0, error: ''
+      });
+      row.dataset.jobId = track.jobId;
+      list.appendChild(row);
+    });
+    totalEnqueued += tracks.length;
+    if (totalEnqueued > 0) {
+      titleEl.textContent = `Descargando ${totalEnqueued} canciones`;
+    }
+  };
+
+  const queue = new DownloadQueue((jobId, status, data) => {
+    updateDownloadRowStatus(jobId, status, data);
+  });
+  
+  // Start queue immediately with whatever we have ready
+  queue.setTracks(tracksToDownload);
+  appendToDOM(queue.tracks);
+  queue.start(3); // Start workers (they will wait dynamically if isFetchingMore=true)
+
+  // Fetch missing albums incrementally
+  for (const item of needsLoading) {
+    let data = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        data = await getAlbumTracks(item.albumId);
+        break;
+      } catch (err) {
+        if (attempt === 3) console.error(`Error loading tracks for album ${item.albumId}:`, err);
+        else await new Promise(r => setTimeout(r, 1000));
+      }
+    }
+    if (!data) continue;
+
+    state.albumTracks[item.albumId] = data.tracks || [];
+    // Initialize track selection
+    data.tracks.forEach(track => {
+      if (!state.selection[item.albumId].tracks[track.id]) {
+        state.selection[item.albumId].tracks[track.id] = true;
+      }
+    });
+
+    const newlyLoaded = [];
+    data.tracks.forEach(track => {
+      if (state.selection[item.albumId].tracks[track.id] !== false) {
+        newlyLoaded.push({
+          ...track,
+          albumType: item.albumType,
+          albumYear: item.albumYear,
+          albumId: item.albumId
+        });
+      }
+    });
+
+    const uniqueNew = enqueueTracks(newlyLoaded);
+    if (uniqueNew.length > 0) {
+      queue.addTracks(uniqueNew);
+      const initializedNew = queue.tracks.slice(-uniqueNew.length);
+      appendToDOM(initializedNew);
+    }
+  }
+
+  queue.finishAddingTracks();
 }
+
 
 function updateDownloadRowStatus(jobId, status, data) {
   if (jobId === '__queue__') {
