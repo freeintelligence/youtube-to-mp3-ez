@@ -168,6 +168,95 @@ async function resolveUrlInfo(url) {
   }
 }
 
+// ── API: Stream audio directly ───────────────────────────────────────
+
+app.get('/api/stream', async (req, res) => {
+  const { url } = req.query;
+  if (!url || !isValidYouTubeUrl(url)) {
+    return res.status(400).send('URL no válida');
+  }
+
+  try {
+    console.log('  [stream] Resolving direct audio URL for:', url);
+    const result = await youtubedl(url, {
+      dumpSingleJson: true,
+      noWarnings: true,
+      noCheckCertificates: true,
+      preferFreeFormats: true,
+      ffmpegLocation: ffmpegPath,
+      noPlaylist: true,
+      format: 'bestaudio/best',
+    });
+
+    const directUrl = result.url;
+    if (!directUrl) {
+      console.error('  [stream] ❌ Could not extract direct stream URL');
+      return res.status(404).send('Direct URL not found');
+    }
+
+    console.log('  [stream] ✓ Direct URL resolved:', directUrl.substring(0, 100) + '...');
+    
+    // Set headers to support Range Requests
+    const headers = { ...req.headers };
+    // Remove headers that might cause Google Video CDN to reject the request
+    delete headers.host;
+    delete headers.connection;
+    delete headers.referer;
+    delete headers.origin;
+
+    const https = require('https');
+    
+    console.log('  [stream] Initiating range-proxy request...');
+    if (req.headers.range) {
+      console.log('  [stream] Client range:', req.headers.range);
+    }
+
+    const proxyReq = https.request(directUrl, {
+      method: 'GET',
+      headers: headers
+    }, (proxyRes) => {
+      console.log(`  [stream] CDN responded with status: ${proxyRes.statusCode}`);
+      
+      // Forward status code
+      res.status(proxyRes.statusCode);
+
+      // Forward response headers
+      for (const [key, value] of Object.entries(proxyRes.headers)) {
+        const lowerKey = key.toLowerCase();
+        if (['content-type', 'content-length', 'content-range', 'accept-ranges', 'cache-control'].includes(lowerKey)) {
+          res.setHeader(key, value);
+        }
+      }
+
+      // Pipe the stream back
+      proxyRes.pipe(res);
+    });
+
+    proxyReq.on('error', (err) => {
+      console.error('  [stream] ❌ Proxy request error:', err);
+      if (!res.headersSent) {
+        res.status(500).send('Proxy stream error');
+      }
+    });
+
+    // Handle client aborting request (disconnecting)
+    req.on('close', () => {
+      if (!res.writableEnded) {
+        console.log('  [stream] Client aborted connection. Aborting proxy request.');
+        proxyReq.destroy();
+      }
+    });
+
+    proxyReq.end();
+
+  } catch (err) {
+    console.error('  [stream] ❌ Error in stream endpoint:', err.message);
+    if (!res.headersSent) {
+      res.status(500).send('Error streaming audio: ' + err.message);
+    }
+  }
+});
+
 // ── API: Get video/playlist info ─────────────────────────────────────
 
 app.post('/api/info', async (req, res) => {

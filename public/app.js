@@ -313,7 +313,7 @@
       </div>
       <span class="track-card__duration">${track.durationFormatted || ''}</span>
       <div class="track-card__actions" style="display:flex; align-items:center;">
-        <button class="music-play-btn" title="Reproducir" style="margin-right:12px; margin-left:0;" onclick="window.showYouTubePlayer('${track.url}')">
+        <button class="music-play-btn" title="Reproducir" style="margin-right:12px; margin-left:0;" onclick="window.globalAudioPlayer.play(currentTracks, ${index})">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
         </button>
         <button class="btn btn--primary btn--sm download-track-btn" data-track-id="${track.id}">

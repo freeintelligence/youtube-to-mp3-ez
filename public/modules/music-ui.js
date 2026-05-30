@@ -77,6 +77,227 @@ window.showYouTubePlayer = function(url) {
   document.body.appendChild(container);
 };
 
+// ── Global Audio Player ──
+class GlobalAudioPlayer {
+  constructor() {
+    this.playlist = [];
+    this.currentIndex = -1;
+    this.audio = new Audio();
+    this.currentYouTubeUrl = null;
+    
+    this.audio.addEventListener('timeupdate', () => this.updateProgress());
+    this.audio.addEventListener('ended', () => this.next());
+    this.audio.addEventListener('playing', () => this.setPlayingState(true));
+    this.audio.addEventListener('pause', () => this.setPlayingState(false));
+
+    this.createUI();
+  }
+
+  createUI() {
+    this.container = document.createElement('div');
+    this.container.id = 'global-audio-player';
+    this.container.className = 'global-audio-player';
+    this.container.innerHTML = `
+      <div class="player-info">
+        <img class="player-cover" id="player-cover" src="" alt="Cover" style="display:none;" />
+        <div class="player-details">
+          <span class="player-title" id="player-title">--</span>
+          <span class="player-artist" id="player-artist">--</span>
+        </div>
+      </div>
+      <div class="player-controls-container">
+        <div class="player-controls">
+          <button class="player-btn" id="player-prev" title="Anterior">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="19 20 9 12 19 4 19 20"></polygon><line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="2"></line></svg>
+          </button>
+          <button class="player-btn play-pause" id="player-play-pause" title="Reproducir">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" id="player-play-icon"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" id="player-pause-icon" style="display:none;"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+          </button>
+          <button class="player-btn" id="player-next" title="Siguiente">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2"></line></svg>
+          </button>
+        </div>
+        <div class="player-progress-container">
+          <span id="player-time-current">0:00</span>
+          <div class="player-progress-bar" id="player-progress-bar">
+            <div class="player-progress-fill" id="player-progress-fill"></div>
+          </div>
+          <span id="player-time-total">0:00</span>
+        </div>
+      </div>
+      <div class="player-actions">
+        <button class="player-video-btn" id="player-video-btn" title="Ver Video en la Web" style="display:none;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33 2.78 2.78 0 0 0 1.94 2c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.33 29 29 0 0 0-.46-5.33z"></path><polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02"></polygon></svg>
+          Ver Video
+        </button>
+      </div>
+    `;
+    
+    document.body.appendChild(this.container);
+
+    this.container.querySelector('#player-play-pause').addEventListener('click', () => this.togglePlay());
+    this.container.querySelector('#player-next').addEventListener('click', () => this.next());
+    this.container.querySelector('#player-prev').addEventListener('click', () => this.prev());
+    
+    const progressBar = this.container.querySelector('#player-progress-bar');
+    progressBar.addEventListener('click', (e) => {
+      if (!this.audio.duration) return;
+      const rect = progressBar.getBoundingClientRect();
+      const percent = (e.clientX - rect.left) / rect.width;
+      this.audio.currentTime = percent * this.audio.duration;
+    });
+
+    this.container.querySelector('#player-video-btn').addEventListener('click', () => {
+      if (this.currentYouTubeUrl) {
+        this.audio.pause();
+        window.showYouTubePlayer(this.currentYouTubeUrl);
+      }
+    });
+  }
+
+  play(playlist, startIndex, options = {}) {
+    this.playlist = playlist;
+    this.currentIndex = startIndex;
+    this.options = options;
+    this.container.classList.add('visible');
+    this.loadCurrentTrack();
+  }
+
+  showLoading(message = 'Cargando...') {
+    // Pause current audio and clear source
+    this.audio.pause();
+    this.audio.src = '';
+
+    const cover = this.container.querySelector('#player-cover');
+    cover.style.display = 'none';
+
+    this.container.querySelector('#player-title').textContent = message;
+    this.container.querySelector('#player-artist').textContent = 'Por favor espera';
+    this.setPlayingState(false);
+    this.currentYouTubeUrl = null;
+    this.container.querySelector('#player-video-btn').style.display = 'none';
+
+    // Reset progress details
+    this.container.querySelector('#player-time-current').textContent = '0:00';
+    this.container.querySelector('#player-time-total').textContent = '0:00';
+    this.container.querySelector('#player-progress-fill').style.width = '0%';
+  }
+
+  async loadCurrentTrack() {
+    const track = this.playlist[this.currentIndex];
+    if (!track) return;
+
+    // Update UI immediately with what we know
+    const cover = this.container.querySelector('#player-cover');
+    cover.src = track.thumbnail || track.coverArtUrl || '';
+    cover.style.display = cover.src ? 'block' : 'none';
+    
+    this.container.querySelector('#player-title').textContent = track.title;
+    this.container.querySelector('#player-artist').textContent = track.artist || track.artistName || 'Desconocido';
+    
+    // Set loading state
+    this.setPlayingState(false);
+    this.currentYouTubeUrl = null;
+    this.container.querySelector('#player-video-btn').style.display = 'none';
+
+    try {
+      let youtubeUrl = track.url;
+      
+      // If we don't have a direct URL, we must resolve it
+      if (!youtubeUrl) {
+        const res = await fetch('/api/music/resolve-track', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            trackName: track.title, 
+            artistName: track.artistName || track.artist, 
+            albumName: track.albumName || '', 
+            durationMs: track.durationMs 
+          })
+        });
+        if (!res.ok) throw new Error('No se pudo resolver el audio');
+        const data = await res.json();
+        youtubeUrl = data.url;
+        
+        if (data.thumbnail) {
+          cover.src = data.thumbnail;
+          cover.style.display = 'block';
+        }
+      }
+
+      this.currentYouTubeUrl = youtubeUrl;
+      this.container.querySelector('#player-video-btn').style.display = 'flex';
+      
+      // Stream via the new endpoint
+      this.audio.src = `/api/stream?url=${encodeURIComponent(youtubeUrl)}`;
+      this.audio.play();
+    } catch (err) {
+      console.error('Player error:', err);
+      alert('Error al reproducir: ' + err.message);
+    }
+  }
+
+  togglePlay() {
+    if (this.audio.paused) {
+      this.audio.play();
+    } else {
+      this.audio.pause();
+    }
+  }
+
+  async next() {
+    if (this.currentIndex < this.playlist.length - 1) {
+      this.currentIndex++;
+      this.loadCurrentTrack();
+    } else if (this.options && typeof this.options.onNextBoundary === 'function') {
+      const result = await this.options.onNextBoundary();
+      if (result) {
+        this.play(result.playlist, result.index, result.options);
+      }
+    }
+  }
+
+  async prev() {
+    if (this.currentIndex > 0) {
+      this.currentIndex--;
+      this.loadCurrentTrack();
+    } else if (this.options && typeof this.options.onPrevBoundary === 'function') {
+      const result = await this.options.onPrevBoundary();
+      if (result) {
+        this.play(result.playlist, result.index, result.options);
+      }
+    }
+  }
+
+  setPlayingState(isPlaying) {
+    this.container.querySelector('#player-play-icon').style.display = isPlaying ? 'none' : 'block';
+    this.container.querySelector('#player-pause-icon').style.display = isPlaying ? 'block' : 'none';
+  }
+
+  updateProgress() {
+    const formatTime = (secs) => {
+      if (isNaN(secs)) return '0:00';
+      const m = Math.floor(secs / 60);
+      const s = Math.floor(secs % 60).toString().padStart(2, '0');
+      return `${m}:${s}`;
+    };
+
+    const current = this.audio.currentTime;
+    const total = this.audio.duration;
+    
+    this.container.querySelector('#player-time-current').textContent = formatTime(current);
+    this.container.querySelector('#player-time-total').textContent = formatTime(total);
+    
+    if (total) {
+      const percent = (current / total) * 100;
+      this.container.querySelector('#player-progress-fill').style.width = `${percent}%`;
+    }
+  }
+}
+
+window.globalAudioPlayer = new GlobalAudioPlayer();
+
 // ── Artist Card ──
 
 export function createArtistCard(artist, onClick) {

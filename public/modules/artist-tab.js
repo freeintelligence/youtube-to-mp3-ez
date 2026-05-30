@@ -263,47 +263,132 @@ function renderAlbumTracks(album, wrapper) {
     
     const row = createTrackRow(track, {
       onCheckChange: (t, checked) => handleTrackCheckChange(album.id, t, checked),
-      onPlay: async (t, btn, rowEl) => {
-        try {
-          btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;"></div>';
-          btn.disabled = true;
-          
-          const res = await fetch('/api/music/resolve-track', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              trackName: t.title, 
-              artistName: state.selectedArtist.name, 
-              albumName: album.title, 
-              durationMs: t.durationMs 
-            })
+      onPlay: (t, btn, rowEl) => {
+        // Find index of clicked track
+        const index = tracks.findIndex(tr => tr.id === t.id);
+        if (index !== -1) {
+          // Inject albumId and cover art
+          tracks.forEach(tr => {
+            tr.albumId = album.id;
+            tr.coverArtUrl = album.coverArtUrl;
           });
           
-          if (!res.ok) throw new Error('Video no encontrado');
-          const data = await res.json();
-          
-          if (data.url) {
-            const cover = rowEl.querySelector('.music-track-row__cover');
-            if (cover && data.thumbnail) {
-              cover.src = data.thumbnail;
-              cover.style.display = 'block';
-            }
-            window.showYouTubePlayer(data.url);
-          } else {
-            throw new Error('No URL returned');
-          }
-        } catch (err) {
-          console.error(err);
-          alert('Error al reproducir: ' + err.message);
-        } finally {
-          btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
-          btn.disabled = false;
+          window.globalAudioPlayer.play(tracks, index, {
+            onNextBoundary: () => handleCrossAlbumNext(album.id),
+            onPrevBoundary: () => handleCrossAlbumPrev(album.id),
+          });
         }
       },
       isChecked,
     });
     body.appendChild(row);
   });
+}
+
+async function handleCrossAlbumNext(currentAlbumId) {
+  const activeAlbums = state.discography.filter(album => !album.type || state.activeFilters.has(album.type));
+  const currentAlbumIndex = activeAlbums.findIndex(a => a.id === currentAlbumId);
+  
+  if (currentAlbumIndex === -1 || currentAlbumIndex === activeAlbums.length - 1) {
+    return null;
+  }
+
+  const nextAlbum = activeAlbums[currentAlbumIndex + 1];
+  
+  // Show loading in the player
+  window.globalAudioPlayer.showLoading(`Cargando "${nextAlbum.title}"...`);
+
+  // Load tracks for nextAlbum
+  let tracks = state.albumTracks[nextAlbum.id];
+  if (!tracks) {
+    try {
+      const data = await getAlbumTracks(nextAlbum.id);
+      tracks = data.tracks || [];
+      state.albumTracks[nextAlbum.id] = tracks;
+      
+      // Auto-expand/render in the UI if the accordion is open
+      const accordion = artistResultsSection.querySelector(`[data-album-id="${nextAlbum.id}"]`);
+      if (accordion) {
+        const body = accordion.querySelector('.album-accordion__tracks');
+        if (body && !accordion.querySelector('.album-accordion__body').hidden) {
+          renderAlbumTracks(nextAlbum, accordion);
+        }
+      }
+      updateSelectionSummary();
+    } catch (err) {
+      console.error('Error loading cross-album tracks:', err);
+      return null;
+    }
+  }
+
+  if (tracks && tracks.length > 0) {
+    tracks.forEach(tr => {
+      tr.albumId = nextAlbum.id;
+      tr.coverArtUrl = nextAlbum.coverArtUrl;
+    });
+    return {
+      playlist: tracks,
+      index: 0,
+      options: {
+        onNextBoundary: () => handleCrossAlbumNext(nextAlbum.id),
+        onPrevBoundary: () => handleCrossAlbumPrev(nextAlbum.id)
+      }
+    };
+  }
+  return null;
+}
+
+async function handleCrossAlbumPrev(currentAlbumId) {
+  const activeAlbums = state.discography.filter(album => !album.type || state.activeFilters.has(album.type));
+  const currentAlbumIndex = activeAlbums.findIndex(a => a.id === currentAlbumId);
+  
+  if (currentAlbumIndex === -1 || currentAlbumIndex === 0) {
+    return null;
+  }
+
+  const prevAlbum = activeAlbums[currentAlbumIndex - 1];
+  
+  // Show loading in the player
+  window.globalAudioPlayer.showLoading(`Cargando "${prevAlbum.title}"...`);
+
+  // Load tracks for prevAlbum
+  let tracks = state.albumTracks[prevAlbum.id];
+  if (!tracks) {
+    try {
+      const data = await getAlbumTracks(prevAlbum.id);
+      tracks = data.tracks || [];
+      state.albumTracks[prevAlbum.id] = tracks;
+      
+      // Auto-expand/render in the UI if the accordion is open
+      const accordion = artistResultsSection.querySelector(`[data-album-id="${prevAlbum.id}"]`);
+      if (accordion) {
+        const body = accordion.querySelector('.album-accordion__tracks');
+        if (body && !accordion.querySelector('.album-accordion__body').hidden) {
+          renderAlbumTracks(prevAlbum, accordion);
+        }
+      }
+      updateSelectionSummary();
+    } catch (err) {
+      console.error('Error loading cross-album tracks:', err);
+      return null;
+    }
+  }
+
+  if (tracks && tracks.length > 0) {
+    tracks.forEach(tr => {
+      tr.albumId = prevAlbum.id;
+      tr.coverArtUrl = prevAlbum.coverArtUrl;
+    });
+    return {
+      playlist: tracks,
+      index: tracks.length - 1,
+      options: {
+        onNextBoundary: () => handleCrossAlbumNext(prevAlbum.id),
+        onPrevBoundary: () => handleCrossAlbumPrev(prevAlbum.id)
+      }
+    };
+  }
+  return null;
 }
 
 // ── Selection Logic ──
