@@ -593,7 +593,7 @@ async function handleStartDownload() {
 
   let totalEnqueued = 0;
 
-  const appendToDOM = (tracks) => {
+  const appendToDOM = (tracks, referenceNode = null) => {
     tracks.forEach(track => {
       const row = createDownloadJobRow({
         track, status: 'pending', progress: 0, error: '', jobId: track.jobId
@@ -603,7 +603,11 @@ async function handleStartDownload() {
         }
       });
       row.dataset.jobId = track.jobId;
-      list.appendChild(row);
+      if (referenceNode) {
+        list.insertBefore(row, referenceNode);
+      } else {
+        list.appendChild(row);
+      }
     });
     totalEnqueued += tracks.length;
     if (totalEnqueued > 0 && !queue.isCancelled) {
@@ -689,12 +693,6 @@ async function handleStartDownload() {
       }
     }
 
-    // Remove loading placeholder row
-    if (placeholder) {
-      placeholder.remove();
-      delete placeholders[item.albumId];
-    }
-
     if (queue.isCancelled) {
       break;
     }
@@ -725,7 +723,13 @@ async function handleStartDownload() {
     if (uniqueNew.length > 0) {
       queue.addTracks(uniqueNew);
       const initializedNew = queue.tracks.slice(-uniqueNew.length);
-      appendToDOM(initializedNew);
+      appendToDOM(initializedNew, placeholder);
+    }
+
+    // Remove loading placeholder row
+    if (placeholder) {
+      placeholder.remove();
+      delete placeholders[item.albumId];
     }
   }
 
