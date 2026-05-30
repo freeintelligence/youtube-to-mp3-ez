@@ -589,26 +589,48 @@
 
   // ── Event Listeners ─────────────────────────────────────────────────
   
-  // Tab Switching
-  tabSingle.addEventListener('click', () => {
-    if (activeTab === 'single') return;
-    activeTab = 'single';
-    tabSingle.classList.add('search-tab--active');
-    tabBulk.classList.remove('search-tab--active');
-    containerSingle.hidden = false;
-    containerBulk.hidden = true;
-    urlInput.focus();
-  });
+  // Tab Switching — supports 4 tabs
+  const tabArtist = document.getElementById('tab-artist');
+  const tabAlbum = document.getElementById('tab-album');
+  const containerArtist = document.getElementById('container-artist');
+  const containerAlbum = document.getElementById('container-album');
+  const artistResultsSection = document.getElementById('artist-results-section');
+  const albumResultsSection = document.getElementById('album-results-section');
 
-  tabBulk.addEventListener('click', () => {
-    if (activeTab === 'bulk') return;
-    activeTab = 'bulk';
-    tabBulk.classList.add('search-tab--active');
-    tabSingle.classList.remove('search-tab--active');
-    containerSingle.hidden = true;
-    containerBulk.hidden = false;
-    bulkInput.focus();
-  });
+  const allTabs = [tabSingle, tabBulk, tabArtist, tabAlbum];
+  const allContainers = [containerSingle, containerBulk, containerArtist, containerAlbum];
+  const tabResultsMap = {
+    single: resultsSection,
+    bulk: resultsSection,
+    artist: artistResultsSection,
+    album: albumResultsSection,
+  };
+
+  function switchTab(name, tabEl, containerEl) {
+    if (activeTab === name) return;
+    activeTab = name;
+    allTabs.forEach(t => t.classList.remove('search-tab--active'));
+    allContainers.forEach(c => { c.hidden = true; });
+    tabEl.classList.add('search-tab--active');
+    containerEl.hidden = false;
+
+    // Show only the results section for the active tab
+    resultsSection.hidden = (name !== 'single' && name !== 'bulk');
+    artistResultsSection.hidden = (name !== 'artist');
+    albumResultsSection.hidden = (name !== 'album');
+
+    // Hide error container when switching
+    errorContainer.hidden = true;
+
+    // Focus appropriate input
+    const inputs = { single: urlInput, bulk: bulkInput, artist: document.getElementById('artist-input'), album: document.getElementById('album-input') };
+    if (inputs[name]) inputs[name].focus();
+  }
+
+  tabSingle.addEventListener('click', () => switchTab('single', tabSingle, containerSingle));
+  tabBulk.addEventListener('click', () => switchTab('bulk', tabBulk, containerBulk));
+  tabArtist.addEventListener('click', () => switchTab('artist', tabArtist, containerArtist));
+  tabAlbum.addEventListener('click', () => switchTab('album', tabAlbum, containerAlbum));
 
   // Single Search
   searchBtn.addEventListener('click', fetchInfo);

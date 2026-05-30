@@ -34,7 +34,10 @@ app.use((req, res, next) => {
   next();
 });
 
+const musicRoutes = require('./src/presentation/musicRoutes');
+
 app.use(express.static(path.join(__dirname, 'public')));
+app.use('/api/music', musicRoutes);
 
 // ── Helpers ──────────────────────────────────────────────────────────
 

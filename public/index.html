@@ -56,6 +56,20 @@
             </svg>
             Descarga masiva
           </button>
+          <button class="search-tab" id="tab-artist" type="button">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+            </svg>
+            Por artista
+          </button>
+          <button class="search-tab" id="tab-album" type="button">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+            Por álbum
+          </button>
         </div>
 
         <!-- Single Link Input Container -->
@@ -111,6 +125,68 @@
             </button>
           </div>
           <p class="search-hint">Se ignorará el texto que no sean enlaces de YouTube. Los enlaces duplicados se limpiarán automáticamente.</p>
+        </div>
+
+        <!-- Artist Search Input Container -->
+        <div class="search-container-artist" id="container-artist" hidden>
+          <div class="search-input-wrapper">
+            <div class="search-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+            </div>
+            <input
+              type="text"
+              id="artist-input"
+              class="search-input"
+              placeholder="Escribe el nombre de un artista..."
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <button id="artist-search-btn" class="search-btn" type="button">
+              <svg class="search-btn__icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"/>
+                <path d="m21 21-4.3-4.3"/>
+              </svg>
+              <span class="search-btn__text">Buscar</span>
+              <div class="search-btn__loader" hidden>
+                <div class="spinner"></div>
+              </div>
+            </button>
+          </div>
+          <p class="search-hint">Busca por artista usando MusicBrainz · Explora su discografía y descarga canciones</p>
+        </div>
+
+        <!-- Album Search Input Container -->
+        <div class="search-container-album" id="container-album" hidden>
+          <div class="search-input-wrapper">
+            <div class="search-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+            </div>
+            <input
+              type="text"
+              id="album-input"
+              class="search-input"
+              placeholder="Escribe el nombre de un álbum..."
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <button id="album-search-btn" class="search-btn" type="button">
+              <svg class="search-btn__icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"/>
+                <path d="m21 21-4.3-4.3"/>
+              </svg>
+              <span class="search-btn__text">Buscar</span>
+              <div class="search-btn__loader" hidden>
+                <div class="spinner"></div>
+              </div>
+            </button>
+          </div>
+          <p class="search-hint">Busca por álbum usando MusicBrainz · Selecciona canciones y descárgalas</p>
         </div>
       </div>
     </section>
@@ -213,6 +289,12 @@
         </div>
       </div>
     </section>
+
+    <!-- Artist Results Section -->
+    <section class="results-section" id="artist-results-section" hidden></section>
+
+    <!-- Album Results Section -->
+    <section class="results-section" id="album-results-section" hidden></section>
   </main>
 
   <footer class="footer">
@@ -220,5 +302,7 @@
   </footer>
 
   <script src="app.js"></script>
+  <script type="module" src="modules/artist-tab.js"></script>
+  <script type="module" src="modules/album-tab.js"></script>
 </body>
 </html>
