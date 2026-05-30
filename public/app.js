@@ -45,6 +45,9 @@
   const toggleBulkErrors = document.getElementById('toggle-bulk-errors');
   const bulkErrorsDetails = document.getElementById('bulk-errors-details');
 
+  // Selection controls
+  const selectAllCb = document.getElementById('select-all-cb');
+
   // ── State ───────────────────────────────────────────────────────────
   let currentTracks = [];
   let downloadQueue = [];
@@ -278,6 +281,16 @@
       const card = createTrackCard(track, index);
       trackList.appendChild(card);
     });
+
+    // Enable selection UI for multi-track results
+    if (data.tracks.length > 1) {
+      trackList.classList.add('track-list--selectable');
+      selectAllCb.checked = true;
+      selectAllCb.indeterminate = false;
+      updateSelectionUI();
+    } else {
+      trackList.classList.remove('track-list--selectable');
+    }
   }
 
   // ── Create Track Card ───────────────────────────────────────────────
@@ -288,6 +301,10 @@
     card.style.animationDelay = `${Math.min(index * 0.05, 1)}s`;
 
     card.innerHTML = `
+      <label class="track-checkbox">
+        <input type="checkbox" class="track-cb" data-track-id="${track.id}" checked>
+        <span class="checkbox-mark"></span>
+      </label>
       <span class="track-card__number">${index + 1}</span>
       <img class="track-card__thumb" src="${track.thumbnail}" alt="${escapeHtml(track.title)}" loading="lazy" />
       <div class="track-card__info">
@@ -310,6 +327,10 @@
     // Bind download button
     const btn = card.querySelector('.download-track-btn');
     btn.addEventListener('click', () => downloadTrack(track));
+
+    // Bind checkbox for selection
+    const cb = card.querySelector('.track-cb');
+    cb.addEventListener('change', updateSelectionUI);
 
     return card;
   }
@@ -465,6 +486,47 @@
     });
   }
 
+  // ── Selection Helpers ────────────────────────────────────────────────
+  function getSelectedTrackIds() {
+    const checkboxes = trackList.querySelectorAll('.track-cb');
+    const selected = new Set();
+    checkboxes.forEach(cb => {
+      if (cb.checked) selected.add(cb.dataset.trackId);
+    });
+    return selected;
+  }
+
+  function updateSelectionUI() {
+    const checkboxes = Array.from(trackList.querySelectorAll('.track-cb'));
+    const total = checkboxes.length;
+    const checked = checkboxes.filter(cb => cb.checked).length;
+
+    // Update select-all checkbox state
+    if (checked === 0) {
+      selectAllCb.checked = false;
+      selectAllCb.indeterminate = false;
+    } else if (checked === total) {
+      selectAllCb.checked = true;
+      selectAllCb.indeterminate = false;
+    } else {
+      selectAllCb.checked = false;
+      selectAllCb.indeterminate = true;
+    }
+
+    // Update download button text and state
+    const textEl = document.getElementById('download-all-text');
+    if (textEl) {
+      if (checked === total) {
+        textEl.textContent = `Descargar todo (${total})`;
+      } else if (checked === 0) {
+        textEl.textContent = 'Selecciona canciones';
+      } else {
+        textEl.textContent = `Descargar seleccionados (${checked})`;
+      }
+    }
+    downloadAllBtn.disabled = checked === 0 || isDownloadingAll;
+  }
+
   // ── Download All ────────────────────────────────────────────────────
   async function downloadAll() {
     if (isDownloadingAll || currentTracks.length === 0) return;
@@ -472,11 +534,14 @@
     downloadAllBtn.disabled = true;
     downloadAllBtn.innerHTML = `
       <div class="spinner"></div>
-      Descargando...
+      <span id="download-all-text">Descargando...</span>
     `;
 
-    for (let i = 0; i < currentTracks.length; i++) {
-      const track = currentTracks[i];
+    const selectedIds = getSelectedTrackIds();
+    const tracksToDownload = currentTracks.filter(t => selectedIds.has(t.id));
+
+    for (let i = 0; i < tracksToDownload.length; i++) {
+      const track = tracksToDownload[i];
       const card = document.getElementById(`track-${track.id}`);
 
       // Skip already completed
@@ -487,7 +552,7 @@
       await downloadTrack(track);
 
       // Small delay between downloads to avoid overwhelming the server
-      if (i < currentTracks.length - 1) {
+      if (i < tracksToDownload.length - 1) {
         await new Promise((r) => setTimeout(r, 1000));
       }
     }
@@ -498,7 +563,7 @@
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="20 6 9 17 4 12"/>
       </svg>
-      ¡Completado!
+      <span id="download-all-text">¡Completado!</span>
     `;
 
     setTimeout(() => {
@@ -508,8 +573,9 @@
           <polyline points="7 10 12 15 17 10"/>
           <line x1="12" y1="15" x2="12" y2="3"/>
         </svg>
-        Descargar todo
+        <span id="download-all-text">Descargar todo</span>
       `;
+      updateSelectionUI();
     }, 3000);
   }
 
@@ -572,6 +638,15 @@
 
   // Download All
   downloadAllBtn.addEventListener('click', downloadAll);
+
+  // Select All checkbox
+  selectAllCb.addEventListener('change', () => {
+    const checkboxes = trackList.querySelectorAll('.track-cb');
+    checkboxes.forEach(cb => {
+      cb.checked = selectAllCb.checked;
+    });
+    updateSelectionUI();
+  });
 
   // Focus input on load
   urlInput.focus();

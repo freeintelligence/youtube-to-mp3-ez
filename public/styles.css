@@ -982,3 +982,125 @@ body {
 .bulk-error-item__msg {
   color: #ef4444;
 }
+
+/* ── Custom Checkboxes ─────────────────────────────────────────────── */
+.track-checkbox {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.track-list--selectable .track-checkbox {
+  display: flex;
+}
+
+.track-checkbox input,
+.select-all-wrapper input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.checkbox-mark {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 2px solid var(--border-glass-hover);
+  background: var(--bg-glass);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.checkbox-mark::after {
+  content: '';
+  width: 10px;
+  height: 5px;
+  border-left: 2px solid white;
+  border-bottom: 2px solid white;
+  transform: rotate(-45deg) scale(0);
+  transition: transform var(--transition-fast);
+  position: absolute;
+  top: 4px;
+}
+
+.track-checkbox input:checked ~ .checkbox-mark,
+.select-all-wrapper input:checked ~ .checkbox-mark {
+  background: var(--gradient-primary);
+  border-color: var(--accent-purple);
+  box-shadow: 0 0 12px rgba(139, 92, 246, 0.3);
+}
+
+.track-checkbox input:checked ~ .checkbox-mark::after,
+.select-all-wrapper input:checked ~ .checkbox-mark::after {
+  transform: rotate(-45deg) scale(1);
+}
+
+.track-checkbox:hover .checkbox-mark,
+.select-all-wrapper:hover .checkbox-mark {
+  border-color: var(--accent-purple);
+  background: rgba(139, 92, 246, 0.1);
+}
+
+/* Indeterminate state for select-all */
+.select-all-wrapper input:indeterminate ~ .checkbox-mark {
+  background: rgba(139, 92, 246, 0.4);
+  border-color: var(--accent-purple);
+}
+
+.select-all-wrapper input:indeterminate ~ .checkbox-mark::after {
+  width: 10px;
+  height: 0;
+  border-left: none;
+  border-bottom: 2px solid white;
+  transform: scale(1);
+  top: 7px;
+}
+
+/* Unchecked track card dimming */
+.track-list--selectable .track-card:has(.track-cb:not(:checked)) {
+  opacity: 0.45;
+}
+
+.track-list--selectable .track-card:has(.track-cb:not(:checked)):hover {
+  opacity: 0.7;
+}
+
+/* ── Playlist Actions ──────────────────────────────────────────────── */
+.playlist-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  flex-shrink: 0;
+}
+
+.select-all-wrapper {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+}
+
+.select-all-label {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .playlist-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
