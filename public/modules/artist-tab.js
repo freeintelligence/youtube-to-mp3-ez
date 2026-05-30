@@ -9,7 +9,7 @@ import { searchArtists, getDiscography, getAlbumTracks } from './music-api.js';
 import {
   createArtistCard, createAlbumAccordion, createTrackRow,
   createLoadingState, createEmptyState, createErrorState,
-  createSelectionSummary, createDownloadJobRow, escapeHtml,
+  createSelectionSummary, createDownloadJobRow, createFilterPills, escapeHtml,
 } from './music-ui.js';
 import { DownloadQueue } from './download-queue.js';
 
@@ -26,6 +26,7 @@ let state = {
   discography: [],
   albumTracks: {},  // albumId → Track[]
   selection: {},    // albumId → { selected: boolean, indeterminate: boolean, tracks: { trackId: boolean } }
+  activeFilters: new Set(),
   isLoading: false,
   phase: 'search',  // 'search' | 'artists' | 'discography' | 'downloading'
 };
@@ -54,6 +55,7 @@ async function handleArtistSearch() {
   state.discography = [];
   state.albumTracks = {};
   state.selection = {};
+  state.activeFilters = new Set();
 
   renderLoading('Buscando artistas...');
 
@@ -112,6 +114,7 @@ async function handleArtistSelected(artist) {
   state.discography = [];
   state.albumTracks = {};
   state.selection = {};
+  state.activeFilters = new Set();
 
   renderLoading(`Cargando discografía de ${artist.name}...`);
 
@@ -132,6 +135,10 @@ async function handleArtistSelected(artist) {
       state.discography.forEach(album => {
         state.selection[album.id] = { selected: true, indeterminate: false, tracks: {} };
       });
+      // Initialize filters
+      const uniqueTypes = new Set(state.discography.map(a => a.type).filter(Boolean));
+      state.activeFilters = new Set(uniqueTypes);
+
       renderDiscography();
     }
   } catch (err) {
@@ -165,11 +172,27 @@ function renderDiscography() {
   });
   artistResultsSection.appendChild(header);
 
+  // Filters
+  const uniqueTypes = new Set(state.discography.map(a => a.type).filter(Boolean));
+  if (uniqueTypes.size > 1) {
+    const filtersContainer = createFilterPills(Array.from(uniqueTypes).sort(), state.activeFilters, (type) => {
+      if (state.activeFilters.has(type)) {
+        state.activeFilters.delete(type);
+      } else {
+        state.activeFilters.add(type);
+      }
+      renderDiscography(); // Re-render
+    });
+    artistResultsSection.appendChild(filtersContainer);
+  }
+
   // Album list
   const list = document.createElement('div');
   list.className = 'album-accordion-list';
 
   state.discography.forEach(album => {
+    if (album.type && !state.activeFilters.has(album.type)) return;
+
     const isChecked = state.selection[album.id]?.selected !== false;
     const accordion = createAlbumAccordion(album, {
       onToggle: handleAlbumExpand,
@@ -295,6 +318,8 @@ function getSelectedTracks() {
   const selected = [];
 
   for (const album of state.discography) {
+    if (album.type && !state.activeFilters.has(album.type)) continue;
+
     const sel = state.selection[album.id];
     if (!sel) continue;
 
@@ -320,6 +345,8 @@ function getTotalSelectedCount() {
   let selectedTracks = 0;
 
   for (const album of state.discography) {
+    if (album.type && !state.activeFilters.has(album.type)) continue;
+
     const sel = state.selection[album.id];
     if (!sel) continue;
 

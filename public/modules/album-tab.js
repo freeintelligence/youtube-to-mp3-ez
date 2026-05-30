@@ -9,7 +9,7 @@ import { searchAlbums, getAlbumTracks } from './music-api.js';
 import {
   createAlbumResultCard, createTrackRow,
   createLoadingState, createEmptyState, createErrorState,
-  createSelectionSummary, createDownloadJobRow, escapeHtml,
+  createSelectionSummary, createDownloadJobRow, createFilterPills, escapeHtml,
 } from './music-ui.js';
 import { DownloadQueue } from './download-queue.js';
 
@@ -25,6 +25,7 @@ let state = {
   selectedAlbum: null,
   tracks: [],
   selectedTrackIds: new Set(),
+  activeFilters: new Set(),
   isLoading: false,
   phase: 'search',  // 'search' | 'albums' | 'tracks' | 'downloading'
 };
@@ -52,6 +53,7 @@ async function handleAlbumSearch() {
   state.selectedAlbum = null;
   state.tracks = [];
   state.selectedTrackIds = new Set();
+  state.activeFilters = new Set();
 
   renderLoading('Buscando álbumes...');
 
@@ -62,6 +64,9 @@ async function handleAlbumSearch() {
     if (state.albums.length === 0) {
       renderEmpty(`No se encontraron álbumes para "${query}"`, 'album');
     } else {
+      // Initialize filters
+      const uniqueTypes = new Set(state.albums.map(a => a.type).filter(Boolean));
+      state.activeFilters = new Set(uniqueTypes);
       renderAlbumResults();
     }
   } catch (err) {
@@ -93,9 +98,24 @@ function renderAlbumResults() {
   });
   albumResultsSection.appendChild(header);
 
+  // Filters
+  const uniqueTypes = new Set(state.albums.map(a => a.type).filter(Boolean));
+  if (uniqueTypes.size > 1) {
+    const filtersContainer = createFilterPills(Array.from(uniqueTypes).sort(), state.activeFilters, (type) => {
+      if (state.activeFilters.has(type)) {
+        state.activeFilters.delete(type);
+      } else {
+        state.activeFilters.add(type);
+      }
+      renderAlbumResults(); // Re-render
+    });
+    albumResultsSection.appendChild(filtersContainer);
+  }
+
   const list = document.createElement('div');
   list.className = 'music-result-list';
   state.albums.forEach(album => {
+    if (album.type && !state.activeFilters.has(album.type)) return;
     list.appendChild(createAlbumResultCard(album, handleAlbumSelected));
   });
   albumResultsSection.appendChild(list);

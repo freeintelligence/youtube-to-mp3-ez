@@ -1152,6 +1152,41 @@ body {
   flex-shrink: 0;
 }
 
+/* ── Filter Pills ────────────────────────────────────────────────── */
+.music-filter-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.music-filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 4px 12px;
+  background: var(--bg-glass);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.music-filter-pill:hover {
+  background: rgba(139, 92, 246, 0.1);
+  border-color: var(--accent-purple);
+  color: var(--accent-purple-light);
+}
+
+.music-filter-pill--active {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(59, 130, 246, 0.15));
+  border-color: var(--accent-purple);
+  color: var(--accent-purple-light);
+}
+
 /* ── Result Card (Artist + Album search results) ─────────────────── */
 .music-result-list {
   display: flex;

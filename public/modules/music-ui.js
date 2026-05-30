@@ -12,6 +12,28 @@ export function escapeHtml(str) {
   return div.innerHTML;
 }
 
+// ── Filters ──
+
+export function createFilterPills(types, activeTypes, onToggle) {
+  const container = document.createElement('div');
+  container.className = 'music-filter-pills';
+
+  types.forEach(type => {
+    const isActive = activeTypes.has(type);
+    const pill = document.createElement('button');
+    pill.className = `music-filter-pill ${isActive ? 'music-filter-pill--active' : ''}`;
+    pill.type = 'button';
+    pill.innerHTML = `
+      ${isActive ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>` : ''}
+      ${escapeHtml(type)}
+    `;
+    pill.addEventListener('click', () => onToggle(type));
+    container.appendChild(pill);
+  });
+
+  return container;
+}
+
 // ── Artist Card ──
 
 export function createArtistCard(artist, onClick) {
