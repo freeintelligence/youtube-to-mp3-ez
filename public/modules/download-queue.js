@@ -41,63 +41,77 @@ export class DownloadQueue {
   }
 
   /**
-   * Process all tracks sequentially.
-   * For each track: resolve → download → report.
+   * Process all tracks with a configurable concurrency limit.
    */
-  async start() {
+  async start(concurrency = 3) {
     if (this.isRunning) return;
     this.isRunning = true;
     this.isCancelled = false;
 
-    for (let i = 0; i < this.tracks.length; i++) {
-      if (this.isCancelled) break;
+    let currentIndex = 0;
 
-      const track = this.tracks[i];
+    const worker = async () => {
+      while (currentIndex < this.tracks.length && !this.isCancelled) {
+        const i = currentIndex++;
+        const track = this.tracks[i];
 
-      // Step 1: Resolve YouTube candidate
-      this._emit(track.id, 'resolving', { message: 'Buscando en YouTube...' });
+        await this._processTrack(track);
 
-      let youtubeUrl;
-      try {
-        const result = await resolveTrackCandidate({
-          artistName: track.artistName,
-          trackName: track.title,
-          albumName: track.albumName,
-          durationMs: track.durationMs,
-        });
-
-        youtubeUrl = result.url;
-        this._emit(track.id, 'resolved', {
-          url: youtubeUrl,
-          title: result.title,
-          score: result.score,
-        });
-      } catch (err) {
-        this._emit(track.id, 'error', {
-          message: err.message || 'No se encontró candidato en YouTube',
-        });
-        continue; // Skip to next track
+        // Small delay between tracks on the same worker
+        if (!this.isCancelled && currentIndex < this.tracks.length) {
+          await new Promise(r => setTimeout(r, 1000));
+        }
       }
+    };
 
-      if (this.isCancelled) break;
-
-      // Step 2: Download via existing /api/download endpoint (SSE)
-      try {
-        await this._downloadViaSSE(track, youtubeUrl);
-      } catch (err) {
-        this._emit(track.id, 'error', {
-          message: err.message || 'Error durante la descarga',
-        });
-      }
-
-      // Small delay between downloads to avoid overwhelming the server
-      if (i < this.tracks.length - 1 && !this.isCancelled) {
-        await new Promise(r => setTimeout(r, 1000));
-      }
+    // Start 'concurrency' number of workers
+    const workers = [];
+    for (let i = 0; i < Math.min(concurrency, this.tracks.length); i++) {
+      workers.push(worker());
     }
+
+    await Promise.all(workers);
 
     this.isRunning = false;
     this._emit('__queue__', 'complete', {});
+  }
+
+  async _processTrack(track) {
+    // Step 1: Resolve YouTube candidate
+    this._emit(track.id, 'resolving', { message: 'Buscando en YouTube...' });
+
+    let youtubeUrl;
+    try {
+      const result = await resolveTrackCandidate({
+        artistName: track.artistName,
+        trackName: track.title,
+        albumName: track.albumName,
+        durationMs: track.durationMs,
+      });
+
+      youtubeUrl = result.url;
+      this._emit(track.id, 'resolved', {
+        url: youtubeUrl,
+        title: result.title,
+        score: result.score,
+      });
+    } catch (err) {
+      this._emit(track.id, 'error', {
+        message: err.message || 'No se encontró candidato en YouTube',
+      });
+      return;
+    }
+
+    if (this.isCancelled) return;
+
+    // Step 2: Download via existing /api/download endpoint (SSE)
+    try {
+      await this._downloadViaSSE(track, youtubeUrl);
+    } catch (err) {
+      this._emit(track.id, 'error', {
+        message: err.message || 'Error durante la descarga',
+      });
+    }
   }
 
   /**
