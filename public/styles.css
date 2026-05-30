@@ -1302,6 +1302,7 @@ body {
 }
 
 .album-accordion__cb {
+  display: flex;
   flex-shrink: 0;
 }
 

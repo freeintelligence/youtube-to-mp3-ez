@@ -621,6 +621,17 @@
 
     // Hide error container when switching
     errorContainer.hidden = true;
+    
+    // Hide empty state for new tabs
+    if (emptyState) {
+      if (name === 'artist' || name === 'album') {
+        emptyState.hidden = true;
+      } else {
+        // For single/bulk, if there are no results yet, show empty state
+        const hasResults = !resultsSection.hidden && trackList.children.length > 0;
+        emptyState.hidden = hasResults;
+      }
+    }
 
     // Focus appropriate input
     const inputs = { single: urlInput, bulk: bulkInput, artist: document.getElementById('artist-input'), album: document.getElementById('album-input') };

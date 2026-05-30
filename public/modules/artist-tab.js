@@ -316,19 +316,28 @@ function getSelectedTracks() {
 }
 
 function getTotalSelectedCount() {
-  let count = 0;
+  let selectedAlbums = 0;
+  let selectedTracks = 0;
+
   for (const album of state.discography) {
     const sel = state.selection[album.id];
     if (!sel) continue;
 
     const tracks = state.albumTracks[album.id];
     if (tracks) {
-      count += tracks.filter(t => sel.tracks[t.id] !== false).length;
+      // Album tracks are loaded
+      const count = tracks.filter(t => sel.tracks[t.id] !== false).length;
+      if (count > 0) {
+        if (count === tracks.length) selectedAlbums++;
+        else selectedTracks += count;
+      }
     } else if (sel.selected) {
-      count += album.trackCount || 1; // Estimate
+      // Entire album is selected but tracks aren't loaded yet
+      selectedAlbums++;
     }
   }
-  return count;
+
+  return { albums: selectedAlbums, tracks: selectedTracks };
 }
 
 // ── Selection Summary ──
@@ -338,12 +347,23 @@ function updateSelectionSummary() {
   const existing = artistResultsSection.querySelector('.music-selection-summary');
   if (existing) existing.remove();
 
-  const selectedCount = getTotalSelectedCount();
+  const { albums, tracks } = getTotalSelectedCount();
   const totalAlbums = state.discography.length;
 
   if (totalAlbums === 0) return;
+  if (albums === 0 && tracks === 0) {
+    const summary = createSelectionSummary('0 seleccionados', 'Selecciona algo para descargar', null, true);
+    artistResultsSection.appendChild(summary);
+    return;
+  }
 
-  const summary = createSelectionSummary(selectedCount, selectedCount, handleStartDownload);
+  let textLeft = '';
+  if (albums > 0) textLeft += `${albums} álbum${albums > 1 ? 'es' : ''}`;
+  if (albums > 0 && tracks > 0) textLeft += ' y ';
+  if (tracks > 0) textLeft += `${tracks} canción${tracks > 1 ? 'es' : ''}`;
+  textLeft += ' seleccionad' + (albums > 0 && tracks === 0 ? 'os' : 'as');
+
+  const summary = createSelectionSummary(textLeft, `Descargar ${textLeft.replace(' seleccionados', '').replace(' seleccionadas', '')}`, handleStartDownload);
   artistResultsSection.appendChild(summary);
 }
 

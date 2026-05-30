@@ -235,8 +235,16 @@ function updateSummary() {
   const total = state.tracks.length;
 
   if (total === 0) return;
+  if (selected === 0) {
+    const summary = createSelectionSummary('0 canciones seleccionadas', 'Selecciona canciones', null, true);
+    albumResultsSection.appendChild(summary);
+    return;
+  }
 
-  const summary = createSelectionSummary(selected, total, handleStartDownload);
+  const textLeft = `${selected} de ${total} canciones seleccionadas`;
+  const textBtn = `Descargar ${selected} canción${selected > 1 ? 'es' : ''}`;
+
+  const summary = createSelectionSummary(textLeft, textBtn, handleStartDownload);
   albumResultsSection.appendChild(summary);
 }
 
