@@ -114,6 +114,7 @@ export class DownloadQueue {
         url: youtubeUrl,
         title: track.title,
         artist: track.artistName,
+        album: track.albumName,
       }),
     });
 

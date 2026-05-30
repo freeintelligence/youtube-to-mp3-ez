@@ -291,21 +291,30 @@ app.post('/api/bulk-info', async (req, res) => {
 
 app.post('/api/download', async (req, res) => {
   try {
-    const { url, title, artist } = req.body;
+    const { url, title, artist, album } = req.body;
 
     if (!url) {
       return res.status(400).json({ error: 'URL requerida' });
     }
 
-    // Build filename from title and artist
-    let filename;
-    if (artist && title && !title.toLowerCase().includes(artist.toLowerCase())) {
-      filename = sanitizeFilename(`${artist} - ${title}`);
-    } else if (title) {
-      filename = sanitizeFilename(title);
-    } else {
-      filename = `track-${Date.now()}`;
+    // Build filename from artist, album, and title
+    let parts = [];
+    if (artist) parts.push(artist);
+    if (album) parts.push(album);
+    
+    if (title) {
+      // If we don't have an album, but the title already includes the artist,
+      // just use the title to avoid duplication (e.g. "Artist - Artist - Song")
+      if (!album && artist && title.toLowerCase().includes(artist.toLowerCase())) {
+        parts = [title];
+      } else {
+        parts.push(title);
+      }
+    } else if (parts.length === 0) {
+      parts = [`track-${Date.now()}`];
     }
+    
+    let filename = sanitizeFilename(parts.join(' - '));
 
     const downloadId = uuidv4();
     const outputPath = path.join(DOWNLOADS_DIR, `${downloadId}.mp3`);
