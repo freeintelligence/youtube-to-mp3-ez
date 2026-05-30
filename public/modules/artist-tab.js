@@ -611,19 +611,46 @@ async function handleStartDownload() {
     }
   };
 
+  const placeholders = {};
+
   const queue = new DownloadQueue((jobId, status, data) => {
     updateDownloadRowStatus(jobId, status, data);
+    if (jobId === '__queue__' && status === 'complete') {
+      Object.values(placeholders).forEach(p => p.remove());
+    }
   });
   
   cancelAllBtn.addEventListener('click', () => {
     queue.cancel();
     titleEl.textContent = 'Descargas canceladas';
     cancelAllBtn.style.display = 'none';
+    Object.values(placeholders).forEach(p => p.remove());
   });
 
   // Start queue immediately with whatever we have ready
   queue.setTracks(tracksToDownload);
   appendToDOM(queue.tracks);
+
+  // Pre-render placeholders for all albums that need track loading
+  needsLoading.forEach(item => {
+    const placeholder = document.createElement('div');
+    placeholder.className = 'music-download-row music-download-row--pending';
+    placeholder.innerHTML = `
+      <div class="music-download-row__status-icon">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+        </svg>
+      </div>
+      <div class="music-download-row__info">
+        <span class="music-download-row__title" style="color: var(--text-muted);">Álbum en cola para cargar canciones...</span>
+        <span class="music-download-row__artist">${escapeHtml(item.albumName)}</span>
+      </div>
+      <span class="music-download-row__status-text" style="color: var(--text-muted);">En cola</span>
+    `;
+    list.appendChild(placeholder);
+    placeholders[item.albumId] = placeholder;
+  });
+
   queue.start(3, true); // Start workers immediately with dynamic support enabled
 
   // Fetch missing albums incrementally
@@ -632,21 +659,23 @@ async function handleStartDownload() {
       break;
     }
 
-    // Append loading placeholder row to list
-    const placeholder = document.createElement('div');
-    placeholder.className = 'music-download-row music-download-row--resolving';
-    placeholder.innerHTML = `
-      <div class="music-download-row__status-icon">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-          <circle cx="12" cy="12" r="10"/><path d="m21 21-4.3-4.3"/>
-        </svg>
-      </div>
-      <div class="music-download-row__info">
-        <span class="music-download-row__title">Cargando canciones del álbum...</span>
-        <span class="music-download-row__artist" style="color: var(--accent-blue); font-weight: 500;">${escapeHtml(item.albumName)}</span>
-      </div>
-    `;
-    list.appendChild(placeholder);
+    // Get the existing placeholder and promote it to active resolving state
+    const placeholder = placeholders[item.albumId];
+    if (placeholder) {
+      placeholder.className = 'music-download-row music-download-row--resolving';
+      placeholder.innerHTML = `
+        <div class="music-download-row__status-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <circle cx="12" cy="12" r="10"/><path d="m21 21-4.3-4.3"/>
+          </svg>
+        </div>
+        <div class="music-download-row__info">
+          <span class="music-download-row__title">Cargando canciones del álbum...</span>
+          <span class="music-download-row__artist" style="color: var(--accent-blue); font-weight: 500;">${escapeHtml(item.albumName)}</span>
+        </div>
+        <span class="music-download-row__status-text" style="color: var(--accent-blue); font-weight: 500; font-size: 0.75rem;">Cargando...</span>
+      `;
+    }
 
     let data = null;
     for (let attempt = 1; attempt <= 3; attempt++) {
@@ -661,7 +690,10 @@ async function handleStartDownload() {
     }
 
     // Remove loading placeholder row
-    placeholder.remove();
+    if (placeholder) {
+      placeholder.remove();
+      delete placeholders[item.albumId];
+    }
 
     if (queue.isCancelled) {
       break;
