@@ -648,9 +648,6 @@ async function handleStartDownload() {
     `;
     list.appendChild(placeholder);
 
-    // Scroll loading row into view so they see it
-    placeholder.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-
     let data = null;
     for (let attempt = 1; attempt <= 3; attempt++) {
       if (queue.isCancelled) break;
