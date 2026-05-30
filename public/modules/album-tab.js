@@ -248,7 +248,7 @@ function renderTrackList() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
-              title: t.title, 
+              trackName: t.title, 
               artistName: state.selectedAlbum.artistName, 
               albumName: state.selectedAlbum.title, 
               durationMs: t.durationMs 

@@ -272,7 +272,7 @@ function renderAlbumTracks(album, wrapper) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
-              title: t.title, 
+              trackName: t.title, 
               artistName: state.selectedArtist.name, 
               albumName: album.title, 
               durationMs: t.durationMs 

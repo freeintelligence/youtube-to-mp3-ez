@@ -54,6 +54,7 @@ class ResolveTrackCandidateUseCase {
       url: result.candidate.url,
       title: result.candidate.title,
       channel: result.candidate.channel,
+      thumbnail: result.candidate.thumbnail,
       score: result.score,
     };
   }
