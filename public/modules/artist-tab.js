@@ -628,8 +628,32 @@ async function handleStartDownload() {
 
   // Fetch missing albums incrementally
   for (const item of needsLoading) {
+    if (queue.isCancelled) {
+      break;
+    }
+
+    // Append loading placeholder row to list
+    const placeholder = document.createElement('div');
+    placeholder.className = 'music-download-row music-download-row--resolving';
+    placeholder.innerHTML = `
+      <div class="music-download-row__status-icon">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <circle cx="12" cy="12" r="10"/><path d="m21 21-4.3-4.3"/>
+        </svg>
+      </div>
+      <div class="music-download-row__info">
+        <span class="music-download-row__title">Cargando canciones del álbum...</span>
+        <span class="music-download-row__artist" style="color: var(--accent-blue); font-weight: 500;">${escapeHtml(item.albumName)}</span>
+      </div>
+    `;
+    list.appendChild(placeholder);
+
+    // Scroll loading row into view so they see it
+    placeholder.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
     let data = null;
     for (let attempt = 1; attempt <= 3; attempt++) {
+      if (queue.isCancelled) break;
       try {
         data = await getAlbumTracks(item.albumId);
         break;
@@ -638,6 +662,14 @@ async function handleStartDownload() {
         else await new Promise(r => setTimeout(r, 1000));
       }
     }
+
+    // Remove loading placeholder row
+    placeholder.remove();
+
+    if (queue.isCancelled) {
+      break;
+    }
+
     if (!data) continue;
 
     state.albumTracks[item.albumId] = data.tracks || [];
